@@ -1,2 +1,3 @@
 anthropic>=0.49
 feedparser>=6.0
+rumps>=0.4

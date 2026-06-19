@@ -5,8 +5,10 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON="${PYTHON:-python3}"
-LABEL="com.poum.nberdigest"
-PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+SCRAPE_LABEL="com.poum.nberdigest"
+MENU_LABEL="com.poum.nberdigest.menubar"
+SCRAPE_PLIST="$HOME/Library/LaunchAgents/$SCRAPE_LABEL.plist"
+MENU_PLIST="$HOME/Library/LaunchAgents/$MENU_LABEL.plist"
 VENV="$HERE/.venv"
 
 echo "==> Creating virtualenv at $VENV"
@@ -26,15 +28,16 @@ else
   echo "==> $HERE/.env already exists; leaving it untouched"
 fi
 
-# --- launchd plist: every Monday 08:00 ------------------------------------
-echo "==> Writing launchd job to $PLIST (Mondays 08:00)"
 mkdir -p "$HOME/Library/LaunchAgents"
-cat > "$PLIST" <<PLIST_EOF
+
+# --- launchd job 1: weekly scrape, Mondays 08:00 --------------------------
+echo "==> Writing weekly scrape job to $SCRAPE_PLIST (Mondays 08:00)"
+cat > "$SCRAPE_PLIST" <<PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>$LABEL</string>
+  <key>Label</key><string>$SCRAPE_LABEL</string>
   <key>ProgramArguments</key>
   <array>
     <string>$VENV/bin/python</string>
@@ -52,9 +55,32 @@ cat > "$PLIST" <<PLIST_EOF
 </plist>
 PLIST_EOF
 
-# Reload the job
-launchctl unload "$PLIST" 2>/dev/null || true
-launchctl load "$PLIST"
+# --- launchd job 2: always-on menu-bar app --------------------------------
+echo "==> Writing menu-bar app job to $MENU_PLIST (runs at login, stays alive)"
+cat > "$MENU_PLIST" <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$MENU_LABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$VENV/bin/python</string>
+    <string>$HERE/menubar_app.py</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>$HERE/menubar.log</string>
+  <key>StandardErrorPath</key><string>$HERE/menubar.log</string>
+</dict>
+</plist>
+PLIST_EOF
 
-echo "==> Done. The digest runs Mondays at 08:00."
-echo "    Test it now with:  $VENV/bin/python $HERE/nber_digest.py"
+# Reload both jobs
+launchctl unload "$SCRAPE_PLIST" 2>/dev/null || true
+launchctl load "$SCRAPE_PLIST"
+launchctl unload "$MENU_PLIST" 2>/dev/null || true
+launchctl load "$MENU_PLIST"
+
+echo "==> Done. Scrape runs Mondays 08:00; the NBER menu-bar icon is now in your top-right bar."
+echo "    Force a scrape now with:  $VENV/bin/python $HERE/nber_digest.py"

@@ -11,7 +11,6 @@ Scheduled:      via launchd (see install.sh)
 
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -22,6 +21,7 @@ HERE = Path(__file__).resolve().parent
 NBER_FEED = "https://back.nber.org/rss/new.xml"
 PROFILE_PATH = HERE / "profile.md"
 SEEN_PATH = HERE / "seen_papers.json"
+DIGEST_PATH = HERE / "digest.json"
 SCORE_THRESHOLD = 80
 MODEL = os.environ.get("NBER_MODEL", "claude-opus-4-8")
 
@@ -141,15 +141,35 @@ def score_papers(papers: list[dict], profile: str) -> dict[str, dict]:
     return {item["number"]: item for item in scored}
 
 
-def notify(title: str, message: str) -> None:
-    """Show a desktop dialog that stays until dismissed (passes text via argv)."""
-    script = (
-        'on run argv\n'
-        '  display dialog (item 1 of argv) with title (item 2 of argv) '
-        'buttons {"OK"} default button "OK" with icon note\n'
-        'end run'
+def write_digest(top: list[dict], by_number: dict[str, dict]) -> None:
+    """Write the scored top papers to digest.json for the menu-bar app.
+
+    Read state is preserved for papers that were already in the previous digest,
+    so re-running mid-week doesn't mark already-read papers unread again.
+    """
+    prev_read: dict[str, bool] = {}
+    if DIGEST_PATH.exists():
+        for p in json.loads(DIGEST_PATH.read_text()).get("papers", []):
+            prev_read[p["number"]] = p.get("read", False)
+
+    papers = []
+    for s in top:
+        paper = by_number.get(s["number"], {})
+        papers.append(
+            {
+                "number": s["number"],
+                "title": paper.get("title", s["number"]),
+                "authors": paper.get("authors", ""),
+                "link": paper.get("link", ""),
+                "score": s["score"],
+                "summary": s["summary"],
+                "why": s["why"],
+                "read": prev_read.get(s["number"], False),
+            }
+        )
+    DIGEST_PATH.write_text(
+        json.dumps({"threshold": SCORE_THRESHOLD, "papers": papers}, indent=2)
     )
-    subprocess.run(["osascript", "-e", script, message, title], check=False)
 
 
 def main() -> int:
@@ -176,19 +196,11 @@ def main() -> int:
         reverse=True,
     )
 
+    write_digest(top, by_number)
     if top:
-        blocks = []
+        print(f"{len(top)} new paper(s) above {SCORE_THRESHOLD}; wrote {DIGEST_PATH.name}.")
         for s in top:
-            paper = by_number.get(s["number"], {})
-            blocks.append(
-                f"[{s['score']}] {paper.get('title', s['number'])}\n"
-                f"{paper.get('authors', '')}\n"
-                f"{s['summary']}\n"
-                f"{paper.get('link', '')}"
-            )
-        message = f"{len(top)} new NBER paper(s) above {SCORE_THRESHOLD}:\n\n" + "\n\n———\n\n".join(blocks)
-        notify("NBER digest — top papers for you", message)
-        print(message)
+            print(f"  [{s['score']}] {by_number[s['number']]['title']}")
     else:
         print(f"No new NBER papers scored above {SCORE_THRESHOLD} this week.")
 

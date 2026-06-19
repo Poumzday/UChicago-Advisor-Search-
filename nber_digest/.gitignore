@@ -1,6 +1,7 @@
 .venv/
 .env
 seen_papers.json
+digest.json
 __pycache__/
 *.pyc
-last_run.log
+*.log
