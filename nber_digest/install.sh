@@ -76,11 +76,12 @@ cat > "$MENU_PLIST" <<PLIST_EOF
 </plist>
 PLIST_EOF
 
-# Reload both jobs
-launchctl unload "$SCRAPE_PLIST" 2>/dev/null || true
-launchctl load "$SCRAPE_PLIST"
-launchctl unload "$MENU_PLIST" 2>/dev/null || true
-launchctl load "$MENU_PLIST"
+# (Re)load both jobs into the GUI session domain (reliable for menu-bar apps)
+GUI="gui/$(id -u)"
+launchctl bootout "$GUI/$SCRAPE_LABEL" 2>/dev/null || true
+launchctl bootstrap "$GUI" "$SCRAPE_PLIST"
+launchctl bootout "$GUI/$MENU_LABEL" 2>/dev/null || true
+launchctl bootstrap "$GUI" "$MENU_PLIST"
 
 echo "==> Done. Scrape runs Mondays 08:00; the NBER menu-bar icon is now in your top-right bar."
 echo "    Force a scrape now with:  $VENV/bin/python $HERE/nber_digest.py"

@@ -9,31 +9,44 @@ file changes, so the weekly Monday scrape updates the dropdown automatically.
 """
 
 import json
+import logging
 import subprocess
+import sys
+import traceback
 import webbrowser
 from functools import partial
 from pathlib import Path
 
 import rumps
+from AppKit import NSAttributedString, NSColor, NSForegroundColorAttributeName
 
 HERE = Path(__file__).resolve().parent
+
+logging.basicConfig(
+    filename=str(HERE / "menubar.log"),
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
 DIGEST_PATH = HERE / "digest.json"
 PYTHON = HERE / ".venv" / "bin" / "python"
 SCRAPER = HERE / "nber_digest.py"
 POLL_SECONDS = 30
 
-TITLE_UNREAD = "🔴 NBER"   # attention color until you click in
-TITLE_READ = "⚪ NBER"     # calm once everything is read
-TITLE_EMPTY = "⚪ NBER"
-
 
 class NberMenuBar(rumps.App):
     def __init__(self) -> None:
-        super().__init__(TITLE_EMPTY, quit_button="Quit")
+        super().__init__("NBER", quit_button="Quit")
         self._mtime = 0.0
         self.papers: list[dict] = []
         self.load()
         rumps.Timer(self.poll, POLL_SECONDS).start()
+        # Status item doesn't exist until the run loop starts; re-color shortly after.
+        self._startup = rumps.Timer(self._on_startup, 1)
+        self._startup.start()
+
+    def _on_startup(self, timer) -> None:
+        timer.stop()
+        self.rebuild()
 
     # --- data -------------------------------------------------------------
     def load(self) -> None:
@@ -59,10 +72,27 @@ class NberMenuBar(rumps.App):
     # --- rendering --------------------------------------------------------
     def rebuild(self) -> None:
         unread = sum(1 for p in self.papers if not p.get("read"))
-        self.title = (
-            f"{TITLE_UNREAD} {unread}" if unread else
-            (TITLE_READ if self.papers else TITLE_EMPTY)
-        )
+        # Plain-text title (emoji in an NSStatusItem can render zero-width);
+        # color carries the unread signal: red when unread, default when read.
+        self.title = f"NBER {unread}" if unread else "NBER"
+        self._color_title(unread)
+
+    def _color_title(self, unread: int) -> None:
+        try:
+            button = self._nsapp.nsstatusitem.button()
+        except Exception:
+            button = None
+        if button is None:
+            return  # run loop hasn't created the status item yet
+        if unread:
+            attrs = {NSForegroundColorAttributeName: NSColor.systemRedColor()}
+            button.setAttributedTitle_(
+                NSAttributedString.alloc().initWithString_attributes_(self.title, attrs)
+            )
+        else:
+            button.setAttributedTitle_(
+                NSAttributedString.alloc().initWithString_(self.title)
+            )
 
         self.menu.clear()
         if not self.papers:
@@ -120,4 +150,10 @@ class NberMenuBar(rumps.App):
 
 
 if __name__ == "__main__":
-    NberMenuBar().run()
+    try:
+        rumps.debug_mode(True)
+        logging.info("starting; python=%s", sys.executable)
+        NberMenuBar().run()
+    except Exception:
+        logging.error("crashed:\n%s", traceback.format_exc())
+        raise

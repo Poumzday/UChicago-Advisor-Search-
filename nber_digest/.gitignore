@@ -5,3 +5,6 @@ digest.json
 __pycache__/
 *.pyc
 *.log
+*.out
+NBER Digest.app/
+.DS_Store
