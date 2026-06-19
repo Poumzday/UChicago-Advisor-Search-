@@ -169,23 +169,17 @@ class NberMenuBar(rumps.App):
             + section("Findings", p.get("findings", ""))
         )
 
-        # Clickable author chips: click a name to reveal its affiliation.
+        # Authors with affiliation shown directly under each name.
         authors = p.get("authors_aff")
         if authors:
-            chips = []
-            for a in authors:
-                name = e(a.get("name", ""))
-                aff = e(a.get("affiliation") or "Affiliation not listed")
-                chips.append(
-                    f'<span class="author" onclick="this.nextElementSibling'
-                    f'.classList.toggle(\'show\')">{name}</span>'
-                    f'<span class="aff">{aff}</span>'
-                )
-            authors_html = " &nbsp;·&nbsp; ".join(chips)
-            hint = '<p class="hint">Click an author to see their affiliation.</p>'
+            blocks = "".join(
+                f'<div class="author"><span class="nm">{e(a.get("name", ""))}</span>'
+                f'<span class="aff">{e(a.get("affiliation") or "Affiliation not listed")}</span></div>'
+                for a in authors
+            )
+            authors_html = f'<div class="authors">{blocks}</div>'
         else:
-            authors_html = e(p.get("authors", ""))
-            hint = ""
+            authors_html = f'<p class="authors">{e(p.get("authors", ""))}</p>'
 
         link = e(p.get("link", ""))
         doc = f"""<!doctype html><html><head><meta charset="utf-8">
@@ -196,12 +190,10 @@ class NberMenuBar(rumps.App):
  .score {{ display:inline-block; background:#b3261e; color:#fff; font-weight:600;
            border-radius:6px; padding:2px 10px; font-size:14px; }}
  h1 {{ font-size: 26px; line-height:1.25; margin: 12px 0 6px; }}
- .authors {{ margin: 0; }}
- .author {{ color:#0071e3; cursor:pointer; text-decoration: underline dotted; }}
- .aff {{ display:none; margin-left:6px; font-size:13px; color:#fff;
-         background:#3a3a3c; padding:1px 8px; border-radius:10px; }}
- .aff.show {{ display:inline-block; }}
- .hint {{ color:#6e6e73; font-size:13px; margin: 4px 0 0; }}
+ .authors {{ margin: 4px 0 0; }}
+ .author {{ margin: 0 0 8px; }}
+ .nm {{ font-weight:600; display:block; }}
+ .aff {{ color:#6e6e73; font-size:13px; display:block; }}
  h2 {{ font-size: 15px; text-transform: uppercase; letter-spacing: .04em;
        color:#6e6e73; margin: 28px 0 6px; }}
  p {{ margin: 0; }}
@@ -210,8 +202,7 @@ class NberMenuBar(rumps.App):
 </style></head><body>
 <span class="score">relevance {p['score']}</span>
 <h1>{e(p['title'])}</h1>
-<p class="authors">{authors_html}</p>
-{hint}
+{authors_html}
 {body}
 <a class="btn" href="{link}">Open paper on NBER ↗</a>
 </body></html>"""
