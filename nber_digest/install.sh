@@ -16,7 +16,7 @@ GUI="gui/$(id -u)"
 
 echo "==> Deploying runtime to: $RT"
 mkdir -p "$RT/pages" "$LA"
-cp "$SRC"/menubar_app.py "$SRC"/weather_app.py "$SRC"/render_chart.py \
+cp "$SRC"/menubar_app.py "$SRC"/weather_app.py \
    "$SRC"/nber_digest.py "$SRC"/profile.md "$SRC"/requirements.txt "$RT"/
 # Seed the digest only if the runtime doesn't have one yet (preserve read state).
 [ -f "$RT/digest.json" ] || { [ -f "$SRC/digest.json" ] && cp "$SRC/digest.json" "$RT"/ || true; }
@@ -25,7 +25,6 @@ echo "==> Building virtualenv + dependencies"
 "$PYTHON" -m venv "$RT/.venv"
 "$RT/.venv/bin/pip" install --quiet --upgrade pip
 "$RT/.venv/bin/pip" install --quiet -r "$RT/requirements.txt"
-MPLCONFIGDIR="$RT/.mplcache" "$RT/.venv/bin/python" -c "import matplotlib.pyplot" >/dev/null 2>&1 || true
 
 # --- API key -> gitignored .env in the runtime -----------------------------
 if [ ! -f "$RT/.env" ]; then

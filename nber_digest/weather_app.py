@@ -2,29 +2,24 @@
 """Menu-bar weather tab.
 
 Shows the current condition icon + temperature (°F) in the menu bar. Clicking it
-drops down today's high/low, your location, and an hourly line graph of the
-temperature with condition labels. Location is auto-detected by IP; data comes
-from the free Open-Meteo forecast API (no key). The chart is rendered by a
-separate subprocess (render_chart.py) so this GUI process imports no matplotlib.
+drops down today's high/low, your location, and the next 10 hours in 2-hour steps
+(temperature + condition, plus the chance of rain when it exceeds 25%). Location
+is auto-detected by IP; data comes from the free Open-Meteo API (no key).
 """
 
 import json
 import logging
-import subprocess
 import sys
 import traceback
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 import rumps
 from AppKit import NSColor, NSImage, NSImageLeft, NSImageSymbolConfiguration
 
 HERE = Path(__file__).resolve().parent
-CHART_PATH = HERE / "pages" / "weather_today.png"
-DATA_PATH = HERE / "pages" / "weather_data.json"
-RENDER = HERE / "render_chart.py"
-PYTHON = HERE / ".venv" / "bin" / "python"
-REFRESH_SECONDS = 1800  # 30 min
+REFRESH_SECONDS = 3600  # update hourly
 
 logging.basicConfig(
     filename=str(HERE / "weather.log"),
@@ -64,6 +59,7 @@ WMO = {
 }
 COLORS = {"yellow": NSColor.systemYellowColor, "gray": NSColor.systemGrayColor,
           "blue": NSColor.systemBlueColor}
+RAIN_THRESHOLD = 25  # only show rain chance when above this (%)
 
 
 def wmo(code: int):
@@ -81,12 +77,36 @@ def fetch_weather() -> dict:
         f"?latitude={lat}&longitude={lon}"
         "&current=temperature_2m,weather_code"
         "&daily=temperature_2m_max,temperature_2m_min"
-        "&hourly=temperature_2m,weather_code"
-        "&temperature_unit=fahrenheit&timezone=auto&forecast_days=1"
+        "&hourly=temperature_2m,weather_code,precipitation_probability"
+        "&temperature_unit=fahrenheit&timezone=auto&forecast_days=2"
     )
     with urllib.request.urlopen(url, timeout=10) as r:
         wx = json.load(r)
     return {"city": city, **wx}
+
+
+def hourly_rows(wx: dict) -> list[str]:
+    """Next 10 hours in 2-hour steps: 'time · temp · condition [· N% rain]'."""
+    h = wx["hourly"]
+    times, temps, codes = h["time"], h["temperature_2m"], h["weather_code"]
+    probs = h.get("precipitation_probability") or [None] * len(times)
+    now = wx["current"]["time"]
+    start = next((i for i, t in enumerate(times) if t >= now), 0)
+
+    rows = []
+    for offset in range(0, 10, 2):
+        i = start + offset
+        if i >= len(times):
+            break
+        label = datetime.fromisoformat(times[i]).strftime("%-I %p")
+        row = f"{label}   ·   {round(temps[i])}°F   ·   {wmo(codes[i])[1]}"
+        p = probs[i]
+        if p is not None:
+            pct = round(p / 5) * 5  # round to 5% increments
+            if pct > RAIN_THRESHOLD:
+                row += f"   ·   {pct}% rain"
+        rows.append(row)
+    return rows
 
 
 class WeatherMenuBar(rumps.App):
@@ -116,7 +136,6 @@ class WeatherMenuBar(rumps.App):
         symbol, label, color = wmo(cur["weather_code"])
         hi = round(wx["daily"]["temperature_2m_max"][0])
         lo = round(wx["daily"]["temperature_2m_min"][0])
-        self._make_chart(wx)
 
         self.title = f"{temp}°F"
         self._set_symbol(symbol, color)
@@ -127,30 +146,11 @@ class WeatherMenuBar(rumps.App):
             f"High {hi}°F    Low {lo}°F",
             wx["city"],
             None,
+            "Next 10 hours",
         ]
-        if CHART_PATH.exists():
-            chart_item = rumps.MenuItem("")
-            chart_item.set_icon(str(CHART_PATH), dimensions=(340, 170))
-            items.append(chart_item)
-            items.append(None)
-        items.append(rumps.MenuItem("Refresh", callback=self.refresh))
+        items += hourly_rows(wx)  # info rows (no callback = display-only)
+        items += [None, rumps.MenuItem("Refresh", callback=self.refresh)]
         self.menu = items
-
-    def _make_chart(self, wx: dict) -> None:
-        """Render the hourly chart in a subprocess (keeps matplotlib out of here)."""
-        data = {
-            "times": wx["hourly"]["time"],
-            "temps": wx["hourly"]["temperature_2m"],
-            "labels": [wmo(c)[1] for c in wx["hourly"]["weather_code"]],
-            "title": "Today's temperature",
-        }
-        DATA_PATH.parent.mkdir(exist_ok=True)
-        DATA_PATH.write_text(json.dumps(data))
-        try:
-            subprocess.run([str(PYTHON), str(RENDER), str(DATA_PATH), str(CHART_PATH)],
-                           check=True, capture_output=True, timeout=60)
-        except Exception:
-            logging.error("chart render failed:\n%s", traceback.format_exc())
 
     def _set_symbol(self, name: str, color: str) -> None:
         try:

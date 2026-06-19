@@ -10,13 +10,15 @@ against your research interests (see `profile.md`), and shows the ones scoring
 - The icon lives quietly in the menu bar — it's the "tab on top" that drops down.
 
 There's also a **weather tab**: a condition icon + temperature (°F) in the menu
-bar; click it for today's high/low, your city, and an hourly temperature graph.
+bar; click it for today's high/low, your city, and the next 10 hours in 2-hour
+steps (temperature, condition, and the chance of rain when it's above 25%). It
+refreshes hourly.
 
 Pieces:
 - `menubar_app.py` — always-on NBER menu-bar app; reads `digest.json`, opens a
   1-page summary per paper (overview / methods / findings, clickable author
   affiliations, link).
-- `weather_app.py` + `render_chart.py` — the weather tab and its chart renderer.
+- `weather_app.py` — the weather tab (hourly forecast list).
 - `nber_digest.py` — the weekly scraper; scores papers and writes `digest.json`.
 
 **Runtime location.** macOS blocks background (launchd) apps from reading
