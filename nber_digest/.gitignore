@@ -1,0 +1,6 @@
+.venv/
+.env
+seen_papers.json
+__pycache__/
+*.pyc
+last_run.log
