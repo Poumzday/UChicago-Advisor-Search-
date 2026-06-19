@@ -8,3 +8,5 @@ __pycache__/
 *.out
 NBER Digest.app/
 .DS_Store
+pages/
+.mplcache/

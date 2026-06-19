@@ -86,10 +86,23 @@ SCORE_SCHEMA = {
                 "properties": {
                     "number": {"type": "string"},
                     "score": {"type": "integer"},
-                    "summary": {"type": "string"},
-                    "why": {"type": "string"},
+                    "authors": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "affiliation": {"type": "string"},
+                            },
+                            "required": ["name", "affiliation"],
+                            "additionalProperties": False,
+                        },
+                    },
+                    "overview": {"type": "string"},
+                    "methods": {"type": "string"},
+                    "findings": {"type": "string"},
                 },
-                "required": ["number", "score", "summary", "why"],
+                "required": ["number", "score", "authors", "overview", "methods", "findings"],
                 "additionalProperties": False,
             },
         }
@@ -108,9 +121,16 @@ def score_papers(papers: list[dict], profile: str) -> dict[str, dict]:
         "topic/area fit is dominant and sets the tier; author reputation only "
         "breaks ties and nudges across tiers (Chicago/Booth economists get a larger "
         "bump than generally-famous economists) and never overrides a weak topic "
-        "match. For each paper return an integer score 0-100, a `summary` of exactly "
-        "five short lines separated by newlines (plain prose, no bullets), and a "
-        "one-sentence `why` explaining the relevance and any author bump applied.\n\n"
+        "match. For each paper return: an integer `score` 0-100; `authors`, a list "
+        "of {name, affiliation} for every author (give each author's current "
+        "institutional affiliation from your knowledge, e.g. 'University of Chicago, "
+        "Booth School of Business'; use 'Affiliation not listed' only if you truly "
+        "don't know); and a one-page write-up as three plain-prose fields: "
+        "`overview` (2-4 sentences on the question and what the paper does), "
+        "`methods` (a detailed paragraph of 5-8 sentences covering the data and "
+        "sample, identification strategy, estimation technique, key specifications, "
+        "and any robustness or validation), and `findings` (3-4 sentences on the "
+        "main results and their magnitudes).\n\n"
         f"=== INTEREST PROFILE ===\n{profile}"
     )
     payload = [
@@ -162,8 +182,10 @@ def write_digest(top: list[dict], by_number: dict[str, dict]) -> None:
                 "authors": paper.get("authors", ""),
                 "link": paper.get("link", ""),
                 "score": s["score"],
-                "summary": s["summary"],
-                "why": s["why"],
+                "authors_aff": s["authors"],
+                "overview": s["overview"],
+                "methods": s["methods"],
+                "findings": s["findings"],
                 "read": prev_read.get(s["number"], False),
             }
         )
