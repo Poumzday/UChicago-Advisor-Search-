@@ -155,6 +155,9 @@ class WeatherMenuBar(rumps.App):
         timer.stop()
         self.refresh(None)
 
+    def _noop(self, _sender) -> None:
+        pass  # info rows need a callback so they render enabled, not greyed out
+
     def refresh(self, _sender) -> None:
         try:
             self._render(fetch_weather())
@@ -176,16 +179,17 @@ class WeatherMenuBar(rumps.App):
         self.title = f"{temp}°F"
         self._set_button_symbol(symbol, color)
 
+        noop = self._noop
         self.menu.clear()
         items = [
-            f"{label} · now {temp}°F",
-            f"High {hi}°F    Low {lo}°F",
-            wx["city"],
+            rumps.MenuItem(f"{label} · now {temp}°F", callback=noop),
+            rumps.MenuItem(f"High {hi}°F    Low {lo}°F", callback=noop),
+            rumps.MenuItem(wx["city"], callback=noop),
             None,
-            "Next 10 hours",
+            rumps.MenuItem("Next 10 hours", callback=noop),
         ]
         for text, sym, col in hourly_rows(wx):
-            mi = rumps.MenuItem(text)
+            mi = rumps.MenuItem(text, callback=noop)
             img = symbol_image(sym, col)
             if img is not None:
                 mi._menuitem.setImage_(img)
