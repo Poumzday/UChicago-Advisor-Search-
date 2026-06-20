@@ -16,7 +16,7 @@ GUI="gui/$(id -u)"
 
 echo "==> Deploying runtime to: $RT"
 mkdir -p "$RT/pages" "$LA"
-cp "$SRC"/menubar_app.py "$SRC"/weather_app.py "$SRC"/bus_app.py \
+cp "$SRC"/dashboard_app.py "$SRC"/menubar_app.py "$SRC"/weather_app.py "$SRC"/bus_app.py \
    "$SRC"/nber_digest.py "$SRC"/profile.md "$SRC"/requirements.txt "$RT"/
 # Seed the digest only if the runtime doesn't have one yet (preserve read state).
 [ -f "$RT/digest.json" ] || { [ -f "$SRC/digest.json" ] && cp "$SRC/digest.json" "$RT"/ || true; }
@@ -60,17 +60,22 @@ KEEPALIVE='  <key>RunAtLoad</key><true/>
 WEEKLY='  <key>StartCalendarInterval</key>
   <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>'
 
-agent_plist com.poum.nberdigest.menubar menubar_app.py "$KEEPALIVE"
-agent_plist com.poum.nberdigest.weather  weather_app.py "$KEEPALIVE"
-agent_plist com.poum.nberdigest.bus      bus_app.py     "$KEEPALIVE"
-agent_plist com.poum.nberdigest          nber_digest.py "$WEEKLY"
+# One consolidated menu-bar item (Bus + Weather + NBER) + the weekly scrape.
+agent_plist com.poum.nberdigest.dashboard dashboard_app.py "$KEEPALIVE"
+agent_plist com.poum.nberdigest           nber_digest.py   "$WEEKLY"
 
-for L in com.poum.nberdigest.menubar com.poum.nberdigest.weather com.poum.nberdigest.bus com.poum.nberdigest; do
+# Remove any older separate menu-bar agents the dashboard replaces.
+for L in com.poum.nberdigest.menubar com.poum.nberdigest.weather com.poum.nberdigest.bus; do
+  launchctl bootout "$GUI/$L" 2>/dev/null || true
+  rm -f "$LA/$L.plist"
+done
+
+for L in com.poum.nberdigest.dashboard com.poum.nberdigest; do
   launchctl bootout "$GUI/$L" 2>/dev/null || true
   launchctl bootstrap "$GUI" "$LA/$L.plist"
 done
 
 echo "==> Done."
-echo "    Menu bar: NBER digest (red + hazard when unread) and a weather tab."
+echo "    One menu-bar item with Bus / Weather / NBER sections."
 echo "    Weekly NBER scrape runs Mondays 08:00."
 echo "    Force a scrape now:  $PY $RT/nber_digest.py"
