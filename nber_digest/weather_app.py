@@ -192,6 +192,7 @@ class WeatherMenuBar(rumps.App):
             items.append(mi)
         items += [None, rumps.MenuItem("Refresh", callback=self.refresh)]
         self.menu = items
+        logging.info("rendered title=%r rows=%d", self.title, len(items))
 
     def _set_button_symbol(self, name: str, color: str) -> None:
         try:
