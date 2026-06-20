@@ -19,6 +19,9 @@ Pieces:
   1-page summary per paper (overview / methods / findings, clickable author
   affiliations, link).
 - `weather_app.py` — the weather tab (hourly forecast list).
+- `bus_app.py` — CTA #6 bus tab: next 3 northbound arrivals at Hyde Park & 53rd
+  (live CTA Bus Tracker predictions; refresh on click). Needs `CTA_API_KEY` in
+  the runtime `.env`.
 - `nber_digest.py` — the weekly scraper; scores papers and writes `digest.json`.
 
 **Runtime location.** macOS blocks background (launchd) apps from reading
